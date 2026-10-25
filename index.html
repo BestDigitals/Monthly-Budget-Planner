@@ -42,12 +42,12 @@
         body.light-mode input[type="text"] {
             color: #1f2328 !important;
         }
-        body.light-mode input[type="number"] {
-            color: #0969da;
+        body.light-mode input.currency-input {
+            color: #0969da !important;
         }
-        body.light-mode input[type="number"]:hover, 
+        body.light-mode input.currency-input:hover, 
         body.light-mode input[type="text"]:hover, 
-        body.light-mode input[type="number"]:focus, 
+        body.light-mode input.currency-input:focus, 
         body.light-mode input[type="text"]:focus {
             background-color: #eef1f5;
             border-color: #0969da;
@@ -98,7 +98,7 @@
         .section-header-debt { background: rgba(168, 85, 247, 0.1); border-bottom: 1px solid rgba(168, 85, 247, 0.2); }
 
         /* Inputs Styling */
-        input[type="number"], input[type="text"], select {
+        input.currency-input, input[type="text"], select {
             background-color: transparent;
             color: #f0f6fc;
             border: 1px solid transparent;
@@ -106,8 +106,8 @@
             padding: 2px 6px;
             transition: all 0.15s ease;
         }
-        input[type="number"]:hover, input[type="text"]:hover, select:hover,
-        input[type="number"]:focus, input[type="text"]:focus, select:focus {
+        input.currency-input:hover, input[type="text"]:hover, select:hover,
+        input.currency-input:focus, input[type="text"]:focus, select:focus {
             background-color: #21262d;
             border-color: #58a6ff;
             outline: none;
@@ -465,9 +465,25 @@
             ]
         };
 
-        // Format Currency Helper
+        // Format Currency Helper for display cards
         function formatCurrency(amount) {
             return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
+        }
+
+        // Format currency string for input display with $ prefix
+        function formatInputDisplay(val) {
+            const num = parseFloat(val);
+            if (isNaN(num) || num === 0) return '$0.00';
+            return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        // Parse raw number from currency input string
+        function parseCurrencyInput(str) {
+            if (!str) return 0;
+            // Remove everything except numbers, decimal point, and negative sign
+            const clean = str.toString().replace(/[^0-9.-]+/g, "");
+            const num = parseFloat(clean);
+            return isNaN(num) ? 0 : num;
         }
 
         // Dark / Light Mode Toggle
@@ -497,7 +513,7 @@
             }
         }
 
-        // Create DOM Row element
+        // Create DOM Row element with robust mobile-friendly currency inputs
         function createRow(desc = "", expected = 0, actual = 0, done = false) {
             const tr = document.createElement('tr');
             tr.className = "hover:bg-[#1c2128] transition-colors";
@@ -511,10 +527,16 @@
                     <input type="text" value="${desc}" placeholder="Description" class="w-full font-medium">
                 </td>
                 <td class="py-2 px-1 text-right">
-                    <input type="number" step="0.01" value="${expected}" oninput="recalculateAll()" class="w-20 text-right text-gray-400 font-mono">
+                    <input type="text" inputmode="decimal" value="${formatInputDisplay(expected)}" 
+                        onfocus="handleInputFocus(this)" 
+                        onblur="handleInputBlur(this, 'expected')" 
+                        oninput="recalculateAll()" class="currency-input w-24 text-right text-gray-400 font-mono">
                 </td>
                 <td class="py-2 px-1 text-right">
-                    <input type="number" step="0.01" value="${actual}" oninput="recalculateAll()" class="w-20 text-right font-semibold font-mono">
+                    <input type="text" inputmode="decimal" value="${formatInputDisplay(actual)}" 
+                        onfocus="handleInputFocus(this)" 
+                        onblur="handleInputBlur(this, 'actual')" 
+                        oninput="recalculateAll()" class="currency-input w-24 text-right font-semibold font-mono">
                 </td>
                 <td class="py-2 text-center">
                     <button onclick="deleteRow(this)" class="text-gray-500 hover:text-rose-400 transition-colors"><i class="fa-solid fa-trash-can"></i></button>
@@ -523,10 +545,24 @@
             return tr;
         }
 
+        // When user focuses on currency input, strip formatting so they can easily type
+        function handleInputFocus(input) {
+            const rawVal = parseCurrencyInput(input.value);
+            input.value = rawVal === 0 ? '' : rawVal;
+            input.select();
+        }
+
+        // When user leaves input, reapply formatted currency with $ sign
+        function handleInputBlur(input, type) {
+            const rawVal = parseCurrencyInput(input.value);
+            input.value = formatInputDisplay(rawVal);
+            recalculateAll();
+        }
+
         // Add Row
         function addRow(tbodyId) {
             const tbody = document.getElementById(tbodyId);
-            tbody.appendChild(createRow());
+            tbody.appendChild(createRow("", 0, 0, false));
             recalculateAll();
         }
 
@@ -540,9 +576,9 @@
         function resetSection(tbodyId) {
             const rows = document.querySelectorAll(`#${tbodyId} tr`);
             rows.forEach(tr => {
-                const numberInputs = tr.querySelectorAll('input[type="number"]');
-                numberInputs.forEach(input => {
-                    input.value = 0;
+                const currencyInputs = tr.querySelectorAll('input.currency-input');
+                currencyInputs.forEach(input => {
+                    input.value = '$0.00';
                 });
             });
             recalculateAll();
@@ -565,9 +601,16 @@
             let total = 0;
             rows.forEach(tr => {
                 const checkbox = tr.querySelector('input[type="checkbox"]');
-                const actualInput = tr.querySelectorAll('input[type="number"]')[1];
-                if (checkbox && !checkbox.checked && actualInput) {
-                    total += parseFloat(actualInput.value) || 0;
+                const inputs = tr.querySelectorAll('input.currency-input');
+                if (inputs.length >= 2) {
+                    // Index 0 is Expected, Index 1 is Actual
+                    // For Income and Savings, we want to sum the ACTUAL values (or expected if actual is 0, let's sum Actual for income/savings, or let's sum Actual column index 1)
+                    const actualVal = parseCurrencyInput(inputs[1].value);
+                    if (checkbox && !checkbox.checked) {
+                        total += actualVal;
+                    } else if (!checkbox) {
+                        total += actualVal;
+                    }
                 }
             });
             return total;
@@ -579,9 +622,12 @@
             let total = 0;
             rows.forEach(tr => {
                 const checkbox = tr.querySelector('input[type="checkbox"]');
-                const actualInput = tr.querySelectorAll('input[type="number"]')[1];
-                if (checkbox && checkbox.checked && actualInput) {
-                    total += parseFloat(actualInput.value) || 0;
+                const inputs = tr.querySelectorAll('input.currency-input');
+                if (inputs.length >= 2) {
+                    const actualVal = parseCurrencyInput(inputs[1].value);
+                    if (checkbox && checkbox.checked) {
+                        total += actualVal;
+                    }
                 }
             });
             return total;
@@ -589,11 +635,11 @@
 
         // Recalculate everything dynamically
         function recalculateAll() {
-            // Unchecked (Active) totals for Income and Savings
+            // Active totals for Income and Savings (Summing Actual values where checkbox is NOT checked, or if no checkbox, all rows)
             const activeIncome = getUncheckedTotal('tbody-income');
             const activeSavings = getUncheckedTotal('tbody-savings');
 
-            // Unchecked totals for Expense section headers
+            // Active totals for Expense section headers (Summing Actual values)
             const activeHousing = getUncheckedTotal('tbody-housing');
             const activeTransport = getUncheckedTotal('tbody-transport');
             const activeLiving = getUncheckedTotal('tbody-living');
@@ -607,7 +653,7 @@
             document.getElementById('header-total-savings').innerText = formatCurrency(activeSavings);
             document.getElementById('header-total-debt').innerText = formatCurrency(activeDebt);
 
-            // Checked totals for Used/Spent calculation (Housing + Transport + Living + Debt)
+            // Checked totals for Used/Spent calculation (Housing + Transport + Living + Debt where checkbox IS checked/paid)
             const paidHousing = getCheckedTotal('tbody-housing');
             const paidTransport = getCheckedTotal('tbody-transport');
             const paidLiving = getCheckedTotal('tbody-living');
