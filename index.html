@@ -151,7 +151,7 @@
 
                     <div class="month-year-container flex items-center gap-1.5 bg-[#0d1117] px-2.5 py-1.5 rounded-lg border border-[#30363d] transition-colors">
                         <span class="text-[10px] font-semibold text-gray-400 uppercase">Month:</span>
-                        <select id="select-month" class="text-xs font-bold text-white bg-transparent cursor-pointer">
+                        <select id="select-month" onchange="handlePeriodChange()" class="text-xs font-bold text-white bg-transparent cursor-pointer">
                             <option value="January" class="bg-[#161b22] text-white">January</option>
                             <option value="February" class="bg-[#161b22] text-white">February</option>
                             <option value="March" class="bg-[#161b22] text-white">March</option>
@@ -169,7 +169,7 @@
 
                     <div class="month-year-container flex items-center gap-1.5 bg-[#0d1117] px-2.5 py-1.5 rounded-lg border border-[#30363d] transition-colors">
                         <span class="text-[10px] font-semibold text-gray-400 uppercase">Year:</span>
-                        <select id="select-year" class="text-xs font-bold text-white bg-transparent cursor-pointer">
+                        <select id="select-year" onchange="handlePeriodChange()" class="text-xs font-bold text-white bg-transparent cursor-pointer">
                             <option value="2025" class="bg-[#161b22] text-white">2025</option>
                             <option value="2026" selected class="bg-[#161b22] text-white">2026</option>
                             <option value="2027" class="bg-[#161b22] text-white">2027</option>
@@ -432,36 +432,36 @@
 
     <!-- JAVASCRIPT LOGIC ENGINE -->
     <script>
-        // Default initial data
-        const initialData = {
+        // Default initial template data for new or reset months
+        const defaultTemplateData = {
             income: [
-                { desc: "Primary Salary", expected: 4500, actual: 4500, done: false },
-                { desc: "Side Hustle / Freelance", expected: 600, actual: 750, done: false },
+                { desc: "Primary Salary", expected: 4500, actual: 0, done: false },
+                { desc: "Side Hustle / Freelance", expected: 600, actual: 0, done: false },
                 { desc: "Investments / Dividends", expected: 150, actual: 0, done: false }
             ],
             housing: [
-                { desc: "Mortgage / Rent", expected: 1600, actual: 1600, done: false },
-                { desc: "Electric & Gas", expected: 150, actual: 165, done: false },
-                { desc: "Water & Trash", expected: 60, actual: 58, done: false },
-                { desc: "Internet / Wifi", expected: 80, actual: 80, done: false }
+                { desc: "Mortgage / Rent", expected: 1600, actual: 0, done: false },
+                { desc: "Electric & Gas", expected: 150, actual: 0, done: false },
+                { desc: "Water & Trash", expected: 60, actual: 0, done: false },
+                { desc: "Internet / Wifi", expected: 80, actual: 0, done: false }
             ],
             transport: [
-                { desc: "Car Payment", expected: 350, actual: 350, done: false },
-                { desc: "Auto Insurance", expected: 140, actual: 140, done: false },
-                { desc: "Gasoline", expected: 180, actual: 180, done: false }
+                { desc: "Car Payment", expected: 350, actual: 0, done: false },
+                { desc: "Auto Insurance", expected: 140, actual: 0, done: false },
+                { desc: "Gasoline", expected: 180, actual: 0, done: false }
             ],
             living: [
-                { desc: "Groceries & Household", expected: 600, actual: 640, done: false },
-                { desc: "Dining Out & Takeout", expected: 250, actual: 210, done: false },
-                { desc: "Entertainment & Subs", expected: 100, actual: 135, done: false }
+                { desc: "Groceries & Household", expected: 600, actual: 0, done: false },
+                { desc: "Dining Out & Takeout", expected: 250, actual: 0, done: false },
+                { desc: "Entertainment & Subs", expected: 100, actual: 0, done: false }
             ],
             savings: [
-                { desc: "Emergency Fund", expected: 500, actual: 500, done: false },
-                { desc: "Roth IRA / Investments", expected: 450, actual: 450, done: false }
+                { desc: "Emergency Fund", expected: 500, actual: 0, done: false },
+                { desc: "Roth IRA / Investments", expected: 450, actual: 0, done: false }
             ],
             debt: [
-                { desc: "Credit Card", expected: 200, actual: 200, done: false },
-                { desc: "Student Loan", expected: 150, actual: 150, done: false }
+                { desc: "Credit Card", expected: 200, actual: 0, done: false },
+                { desc: "Student Loan", expected: 150, actual: 0, done: false }
             ]
         };
 
@@ -480,7 +480,6 @@
         // Parse raw number from currency input string
         function parseCurrencyInput(str) {
             if (!str) return 0;
-            // Remove everything except numbers, decimal point, and negative sign
             const clean = str.toString().replace(/[^0-9.-]+/g, "");
             const num = parseFloat(clean);
             return isNaN(num) ? 0 : num;
@@ -516,7 +515,7 @@
         // Create DOM Row element with robust mobile-friendly currency inputs
         function createRow(desc = "", expected = 0, actual = 0, done = false) {
             const tr = document.createElement('tr');
-            tr.className = "hover:bg-[#1c2128] transition-colors";
+            tr.className = "hover:bg-[#1c2128] transition-colors budget-row";
             if (done) tr.classList.add('row-checked');
 
             tr.innerHTML = `
@@ -524,19 +523,19 @@
                     <input type="checkbox" ${done ? 'checked' : ''} onchange="toggleRowDone(this)" class="w-4 h-4 rounded cursor-pointer accent-blue-500">
                 </td>
                 <td class="py-2 px-1">
-                    <input type="text" value="${desc}" placeholder="Description" class="w-full font-medium">
+                    <input type="text" value="${desc}" placeholder="Description" class="w-full font-medium row-desc" oninput="saveCurrentMonthData()">
                 </td>
                 <td class="py-2 px-1 text-right">
                     <input type="text" inputmode="decimal" value="${formatInputDisplay(expected)}" 
                         onfocus="handleInputFocus(this)" 
                         onblur="handleInputBlur(this, 'expected')" 
-                        oninput="recalculateAll()" class="currency-input w-24 text-right text-gray-400 font-mono">
+                        oninput="recalculateAll()" class="currency-input expected-input w-24 text-right text-gray-400 font-mono">
                 </td>
                 <td class="py-2 px-1 text-right">
                     <input type="text" inputmode="decimal" value="${formatInputDisplay(actual)}" 
                         onfocus="handleInputFocus(this)" 
                         onblur="handleInputBlur(this, 'actual')" 
-                        oninput="recalculateAll()" class="currency-input w-24 text-right font-semibold font-mono">
+                        oninput="recalculateAll()" class="currency-input actual-input w-24 text-right font-semibold font-mono">
                 </td>
                 <td class="py-2 text-center">
                     <button onclick="deleteRow(this)" class="text-gray-500 hover:text-rose-400 transition-colors"><i class="fa-solid fa-trash-can"></i></button>
@@ -552,7 +551,7 @@
             input.select();
         }
 
-        // When user leaves input, reapply formatted currency with $ sign
+        // When user leaves input, reapply formatted currency with $ sign and save
         function handleInputBlur(input, type) {
             const rawVal = parseCurrencyInput(input.value);
             input.value = formatInputDisplay(rawVal);
@@ -595,55 +594,62 @@
             recalculateAll();
         }
 
-        // Helper: Get active (UNCHECKED) total for a table section
-        function getUncheckedTotal(tbodyId) {
+        // Core effective amount getter: 
+        // If actual has been entered (> 0), use actual. Otherwise, fallback to expected (planned ahead).
+        function getEffectiveAmount(expectedVal, actualVal) {
+            return actualVal > 0 ? actualVal : expectedVal;
+        }
+
+        // Helper: Get active section total considering Expected vs Actual rule
+        function getSectionEffectiveTotal(tbodyId) {
             const rows = document.querySelectorAll(`#${tbodyId} tr`);
             let total = 0;
             rows.forEach(tr => {
                 const checkbox = tr.querySelector('input[type="checkbox"]');
                 const inputs = tr.querySelectorAll('input.currency-input');
                 if (inputs.length >= 2) {
-                    // Index 0 is Expected, Index 1 is Actual
-                    // For Income and Savings, we want to sum the ACTUAL values (or expected if actual is 0, let's sum Actual for income/savings, or let's sum Actual column index 1)
+                    const expectedVal = parseCurrencyInput(inputs[0].value);
                     const actualVal = parseCurrencyInput(inputs[1].value);
+                    const effective = getEffectiveAmount(expectedVal, actualVal);
+
                     if (checkbox && !checkbox.checked) {
-                        total += actualVal;
+                        total += effective;
                     } else if (!checkbox) {
-                        total += actualVal;
+                        total += effective;
                     }
                 }
             });
             return total;
         }
 
-        // Helper: Get CHECKED total for an expense section
-        function getCheckedTotal(tbodyId) {
+        // Helper: Get checked/paid actual total for expenses/savings
+        function getCheckedPaidTotal(tbodyId) {
             const rows = document.querySelectorAll(`#${tbodyId} tr`);
             let total = 0;
             rows.forEach(tr => {
                 const checkbox = tr.querySelector('input[type="checkbox"]');
                 const inputs = tr.querySelectorAll('input.currency-input');
                 if (inputs.length >= 2) {
+                    const expectedVal = parseCurrencyInput(inputs[0].value);
                     const actualVal = parseCurrencyInput(inputs[1].value);
+                    const effective = getEffectiveAmount(expectedVal, actualVal);
                     if (checkbox && checkbox.checked) {
-                        total += actualVal;
+                        total += effective;
                     }
                 }
             });
             return total;
         }
 
-        // Recalculate everything dynamically
+        // Recalculate everything dynamically and save state
         function recalculateAll() {
-            // Active totals for Income and Savings (Summing Actual values where checkbox is NOT checked, or if no checkbox, all rows)
-            const activeIncome = getUncheckedTotal('tbody-income');
-            const activeSavings = getUncheckedTotal('tbody-savings');
+            const activeIncome = getSectionEffectiveTotal('tbody-income');
+            const activeSavings = getSectionEffectiveTotal('tbody-savings');
 
-            // Active totals for Expense section headers (Summing Actual values)
-            const activeHousing = getUncheckedTotal('tbody-housing');
-            const activeTransport = getUncheckedTotal('tbody-transport');
-            const activeLiving = getUncheckedTotal('tbody-living');
-            const activeDebt = getUncheckedTotal('tbody-debt');
+            const activeHousing = getSectionEffectiveTotal('tbody-housing');
+            const activeTransport = getSectionEffectiveTotal('tbody-transport');
+            const activeLiving = getSectionEffectiveTotal('tbody-living');
+            const activeDebt = getSectionEffectiveTotal('tbody-debt');
 
             // Update Section Headers
             document.getElementById('header-total-income').innerText = formatCurrency(activeIncome);
@@ -653,16 +659,15 @@
             document.getElementById('header-total-savings').innerText = formatCurrency(activeSavings);
             document.getElementById('header-total-debt').innerText = formatCurrency(activeDebt);
 
-            // Checked totals for Used/Spent calculation (Housing + Transport + Living + Debt where checkbox IS checked/paid)
-            const paidHousing = getCheckedTotal('tbody-housing');
-            const paidTransport = getCheckedTotal('tbody-transport');
-            const paidLiving = getCheckedTotal('tbody-living');
-            const paidDebt = getCheckedTotal('tbody-debt');
+            // Paid expenses for usage calculation
+            const paidHousing = getCheckedPaidTotal('tbody-housing');
+            const paidTransport = getCheckedPaidTotal('tbody-transport');
+            const paidLiving = getCheckedPaidTotal('tbody-living');
+            const paidDebt = getCheckedPaidTotal('tbody-debt');
 
             const usedSpentTotal = paidHousing + paidTransport + paidLiving + paidDebt;
-            const paidSavings = getCheckedTotal('tbody-savings');
+            const paidSavings = getCheckedPaidTotal('tbody-savings');
 
-            // Remaining balance = Active Income minus paid expenses and paid savings
             const remainingBalance = activeIncome - usedSpentTotal - paidSavings;
 
             // Update Dashboard Cards
@@ -670,9 +675,21 @@
             document.getElementById('card-used-spent').innerText = formatCurrency(usedSpentTotal);
             document.getElementById('card-savings').innerText = formatCurrency(activeSavings);
             document.getElementById('card-remaining-balance').innerText = formatCurrency(remainingBalance);
+
+            saveCurrentMonthData();
         }
 
-        // Populate Initial Tables
+        // Populate Tables from Data Object
+        function loadDataIntoTables(data) {
+            populateTable('tbody-income', data.income || defaultTemplateData.income);
+            populateTable('tbody-housing', data.housing || defaultTemplateData.housing);
+            populateTable('tbody-transport', data.transport || defaultTemplateData.transport);
+            populateTable('tbody-living', data.living || defaultTemplateData.living);
+            populateTable('tbody-savings', data.savings || defaultTemplateData.savings);
+            populateTable('tbody-debt', data.debt || defaultTemplateData.debt);
+            recalculateAll();
+        }
+
         function populateTable(tbodyId, dataList) {
             const tbody = document.getElementById(tbodyId);
             tbody.innerHTML = '';
@@ -681,19 +698,69 @@
             });
         }
 
-        // Reset to Default Setup
+        // Get current selected storage key based on Month and Year
+        function getStorageKey() {
+            const month = document.getElementById('select-month').value;
+            const year = document.getElementById('select-year').value;
+            return `budget_data_${month}_${year}`;
+        }
+
+        // Save current table state to localStorage for the active month/year
+        function saveCurrentMonthData() {
+            const key = getStorageKey();
+            const getDataFromTable = (tbodyId) => {
+                const rows = document.querySelectorAll(`#${tbodyId} tr`);
+                const list = [];
+                rows.forEach(tr => {
+                    const desc = tr.querySelector('input.row-desc')?.value || '';
+                    const inputs = tr.querySelectorAll('input.currency-input');
+                    const expected = inputs.length >= 1 ? parseCurrencyInput(inputs[0].value) : 0;
+                    const actual = inputs.length >= 2 ? parseCurrencyInput(inputs[1].value) : 0;
+                    const done = tr.querySelector('input[type="checkbox"]')?.checked || false;
+                    list.push({ desc, expected, actual, done });
+                });
+                return list;
+            };
+
+            const monthData = {
+                income: getDataFromTable('tbody-income'),
+                housing: getDataFromTable('tbody-housing'),
+                transport: getDataFromTable('tbody-transport'),
+                living: getDataFromTable('tbody-living'),
+                savings: getDataFromTable('tbody-savings'),
+                debt: getDataFromTable('tbody-debt')
+            };
+
+            localStorage.setItem(key, JSON.stringify(monthData));
+        }
+
+        // When user changes Month or Year selector
+        function handlePeriodChange() {
+            const key = getStorageKey();
+            const saved = localStorage.getItem(key);
+
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    loadDataIntoTables(parsed);
+                } catch (e) {
+                    loadDataIntoTables(defaultTemplateData);
+                }
+            } else {
+                // If switching to a new month with no saved data, load a fresh template with zeroed actuals
+                loadDataIntoTables(defaultTemplateData);
+            }
+        }
+
+        // Reset to Default Setup for current month
         function resetToDefaults() {
-            populateTable('tbody-income', initialData.income);
-            populateTable('tbody-housing', initialData.housing);
-            populateTable('tbody-transport', initialData.transport);
-            populateTable('tbody-living', initialData.living);
-            populateTable('tbody-savings', initialData.savings);
-            populateTable('tbody-debt', initialData.debt);
-            recalculateAll();
+            loadDataIntoTables(defaultTemplateData);
         }
 
         // Initialize App on Load
-        window.onload = resetToDefaults;
+        window.onload = function() {
+            handlePeriodChange();
+        };
     </script>
 </body>
 </html>
