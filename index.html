@@ -173,6 +173,9 @@
                             <option value="2025" class="bg-[#161b22] text-white">2025</option>
                             <option value="2026" selected class="bg-[#161b22] text-white">2026</option>
                             <option value="2027" class="bg-[#161b22] text-white">2027</option>
+                            <option value="2028" class="bg-[#161b22] text-white">2028</option>
+                            <option value="2029" class="bg-[#161b22] text-white">2029</option>
+                            <option value="2030" class="bg-[#161b22] text-white">2030</option>
                         </select>
                     </div>
 
@@ -529,12 +532,14 @@
                     <input type="text" inputmode="decimal" value="${formatInputDisplay(expected)}" 
                         onfocus="handleInputFocus(this)" 
                         onblur="handleInputBlur(this, 'expected')" 
+                        onkeyup="recalculateAll()"
                         oninput="recalculateAll()" class="currency-input expected-input w-24 text-right text-gray-400 font-mono">
                 </td>
                 <td class="py-2 px-1 text-right">
                     <input type="text" inputmode="decimal" value="${formatInputDisplay(actual)}" 
                         onfocus="handleInputFocus(this)" 
                         onblur="handleInputBlur(this, 'actual')" 
+                        onkeyup="recalculateAll()"
                         oninput="recalculateAll()" class="currency-input actual-input w-24 text-right font-semibold font-mono">
                 </td>
                 <td class="py-2 text-center">
@@ -549,6 +554,7 @@
             const rawVal = parseCurrencyInput(input.value);
             input.value = rawVal === 0 ? '' : rawVal;
             input.select();
+            recalculateAll();
         }
 
         // When user leaves input, reapply formatted currency with $ sign and save
@@ -605,37 +611,28 @@
             const rows = document.querySelectorAll(`#${tbodyId} tr`);
             let total = 0;
             rows.forEach(tr => {
-                const checkbox = tr.querySelector('input[type="checkbox"]');
                 const inputs = tr.querySelectorAll('input.currency-input');
                 if (inputs.length >= 2) {
                     const expectedVal = parseCurrencyInput(inputs[0].value);
                     const actualVal = parseCurrencyInput(inputs[1].value);
                     const effective = getEffectiveAmount(expectedVal, actualVal);
-
-                    if (checkbox && !checkbox.checked) {
-                        total += effective;
-                    } else if (!checkbox) {
-                        total += effective;
-                    }
+                    total += effective;
                 }
             });
             return total;
         }
 
-        // Helper: Get checked/paid actual total for expenses/savings
-        function getCheckedPaidTotal(tbodyId) {
+        // Helper: Get expense total for Used/Spent using Expected until Actual is entered
+        function getExpenseTotalForSpent(tbodyId) {
             const rows = document.querySelectorAll(`#${tbodyId} tr`);
             let total = 0;
             rows.forEach(tr => {
-                const checkbox = tr.querySelector('input[type="checkbox"]');
                 const inputs = tr.querySelectorAll('input.currency-input');
                 if (inputs.length >= 2) {
                     const expectedVal = parseCurrencyInput(inputs[0].value);
                     const actualVal = parseCurrencyInput(inputs[1].value);
                     const effective = getEffectiveAmount(expectedVal, actualVal);
-                    if (checkbox && checkbox.checked) {
-                        total += effective;
-                    }
+                    total += effective;
                 }
             });
             return total;
@@ -652,41 +649,78 @@
             const activeDebt = getSectionEffectiveTotal('tbody-debt');
 
             // Update Section Headers
-            document.getElementById('header-total-income').innerText = formatCurrency(activeIncome);
-            document.getElementById('header-total-housing').innerText = formatCurrency(activeHousing);
-            document.getElementById('header-total-transport').innerText = formatCurrency(activeTransport);
-            document.getElementById('header-total-living').innerText = formatCurrency(activeLiving);
-            document.getElementById('header-total-savings').innerText = formatCurrency(activeSavings);
-            document.getElementById('header-total-debt').innerText = formatCurrency(activeDebt);
+            const headerIncome = document.getElementById('header-total-income');
+            const headerHousing = document.getElementById('header-total-housing');
+            const headerTransport = document.getElementById('header-total-transport');
+            const headerLiving = document.getElementById('header-total-living');
+            const headerSavings = document.getElementById('header-total-savings');
+            const headerDebt = document.getElementById('header-total-debt');
 
-            // Paid expenses for usage calculation
-            const paidHousing = getCheckedPaidTotal('tbody-housing');
-            const paidTransport = getCheckedPaidTotal('tbody-transport');
-            const paidLiving = getCheckedPaidTotal('tbody-living');
-            const paidDebt = getCheckedPaidTotal('tbody-debt');
+            if (headerIncome) headerIncome.innerText = formatCurrency(activeIncome);
+            if (headerHousing) headerHousing.innerText = formatCurrency(activeHousing);
+            if (headerTransport) headerTransport.innerText = formatCurrency(activeTransport);
+            if (headerLiving) headerLiving.innerText = formatCurrency(activeLiving);
+            if (headerSavings) headerSavings.innerText = formatCurrency(activeSavings);
+            if (headerDebt) headerDebt.innerText = formatCurrency(activeDebt);
 
-            const usedSpentTotal = paidHousing + paidTransport + paidLiving + paidDebt;
-            const paidSavings = getCheckedPaidTotal('tbody-savings');
+            // Expense totals for Used/Spent calculation (Housing, Transportation, Living, Debt)
+            const spentHousing = getExpenseTotalForSpent('tbody-housing');
+            const spentTransport = getExpenseTotalForSpent('tbody-transport');
+            const spentLiving = getExpenseTotalForSpent('tbody-living');
+            const spentDebt = getExpenseTotalForSpent('tbody-debt');
 
-            const remainingBalance = activeIncome - usedSpentTotal - paidSavings;
+            const usedSpentTotal = spentHousing + spentTransport + spentLiving + spentDebt;
+            const remainingBalance = activeIncome - usedSpentTotal - activeSavings;
 
             // Update Dashboard Cards
-            document.getElementById('card-net-income').innerText = formatCurrency(activeIncome);
-            document.getElementById('card-used-spent').innerText = formatCurrency(usedSpentTotal);
-            document.getElementById('card-savings').innerText = formatCurrency(activeSavings);
-            document.getElementById('card-remaining-balance').innerText = formatCurrency(remainingBalance);
+            const cardIncome = document.getElementById('card-net-income');
+            const cardSpent = document.getElementById('card-used-spent');
+            const cardSavings = document.getElementById('card-savings');
+            const cardRemaining = document.getElementById('card-remaining-balance');
+
+            if (cardIncome) cardIncome.innerText = formatCurrency(activeIncome);
+            if (cardSpent) cardSpent.innerText = formatCurrency(usedSpentTotal);
+            if (cardSavings) cardSavings.innerText = formatCurrency(activeSavings);
+            if (cardRemaining) cardRemaining.innerText = formatCurrency(remainingBalance);
 
             saveCurrentMonthData();
         }
 
+        // Helper to get structured default data copy
+        function getDefaultTemplateData() {
+            return JSON.parse(JSON.stringify(defaultTemplateData));
+        }
+
+        // Get recent non-empty data across available stored months to avoid reverting to default hardcoded numbers
+        function getLatestUserData() {
+            const monthOptions = Array.from(document.getElementById('select-month').options).map(o => o.value);
+            const yearOptions = Array.from(document.getElementById('select-year').options).map(o => o.value);
+
+            for (let y = yearOptions.length - 1; y >= 0; y--) {
+                for (let m = monthOptions.length - 1; m >= 0; m--) {
+                    const key = `budget_data_${monthOptions[m]}_${yearOptions[y]}`;
+                    const saved = localStorage.getItem(key);
+                    if (saved) {
+                        try {
+                            const parsed = JSON.parse(saved);
+                            if (parsed && Object.keys(parsed).length > 0) {
+                                return parsed;
+                            }
+                        } catch (e) {}
+                    }
+                }
+            }
+            return getDefaultTemplateData();
+        }
+
         // Populate Tables from Data Object
         function loadDataIntoTables(data) {
-            populateTable('tbody-income', data.income || defaultTemplateData.income);
-            populateTable('tbody-housing', data.housing || defaultTemplateData.housing);
-            populateTable('tbody-transport', data.transport || defaultTemplateData.transport);
-            populateTable('tbody-living', data.living || defaultTemplateData.living);
-            populateTable('tbody-savings', data.savings || defaultTemplateData.savings);
-            populateTable('tbody-debt', data.debt || defaultTemplateData.debt);
+            populateTable('tbody-income', data.income || []);
+            populateTable('tbody-housing', data.housing || []);
+            populateTable('tbody-transport', data.transport || []);
+            populateTable('tbody-living', data.living || []);
+            populateTable('tbody-savings', data.savings || []);
+            populateTable('tbody-debt', data.debt || []);
             recalculateAll();
         }
 
@@ -744,17 +778,45 @@
                     const parsed = JSON.parse(saved);
                     loadDataIntoTables(parsed);
                 } catch (e) {
-                    loadDataIntoTables(defaultTemplateData);
+                    loadDataIntoTables(getDefaultTemplateData());
                 }
             } else {
-                // If switching to a new month with no saved data, load a fresh template with zeroed actuals
-                loadDataIntoTables(defaultTemplateData);
+                // Carry over row item descriptions and expected budgets from previous entries, resetting actual values to zero for the new month
+                const sourceData = getLatestUserData();
+                const freshMonthData = {};
+                
+                Object.keys(sourceData).forEach(category => {
+                    freshMonthData[category] = (sourceData[category] || []).map(item => ({
+                        desc: item.desc,
+                        expected: item.expected,
+                        actual: 0,
+                        done: false
+                    }));
+                });
+
+                loadDataIntoTables(freshMonthData);
+                saveCurrentMonthData();
             }
         }
 
         // Reset to Default Setup for current month
         function resetToDefaults() {
-            loadDataIntoTables(defaultTemplateData);
+            const tbodyIds = ['tbody-income', 'tbody-housing', 'tbody-transport', 'tbody-living', 'tbody-savings', 'tbody-debt'];
+            tbodyIds.forEach(id => {
+                const rows = document.querySelectorAll(`#${id} tr`);
+                rows.forEach(tr => {
+                    const currencyInputs = tr.querySelectorAll('input.currency-input');
+                    currencyInputs.forEach(input => {
+                        input.value = '$0.00';
+                    });
+                    const checkbox = tr.querySelector('input[type="checkbox"]');
+                    if (checkbox) {
+                        checkbox.checked = false;
+                        tr.classList.remove('row-checked');
+                    }
+                });
+            });
+            recalculateAll();
         }
 
         // Initialize App on Load
