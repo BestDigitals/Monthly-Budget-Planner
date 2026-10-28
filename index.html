@@ -792,7 +792,9 @@
             const spentDebt = getExpenseTotalForSpent('tbody-debt');
 
             const usedSpentTotal = spentHousing + spentTransport + spentLiving + spentDebt;
-            const remainingBalance = activeIncome - usedSpentTotal - activeSavings;
+
+            // REMAINING BALANCE: Strictly Net Income minus Used / Spent
+            const remainingBalance = activeIncome - usedSpentTotal;
 
             // Update Dashboard Cards
             const cardIncome = document.getElementById('card-net-income');
